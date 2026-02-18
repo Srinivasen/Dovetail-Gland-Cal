@@ -650,7 +650,7 @@ function evaluateWarnings(out){
   out.temperatureResults.forEach(t => {
     if (t.compressionPct < 15) warn.push(`Compression ${t.tempC}°C < 15%`);
     if (t.compressionPct > 30) warn.push(`Compression ${t.tempC}°C > 30%`);
-    if (t.glandFillPct > 95)   warn.push(`Gland fill ${t.tempC}°C > 95%`);
+    if (t.glandFillPct > 90)   warn.push(`Gland fill ${t.tempC}°C > 90%`);
   });
 
   return warn;
@@ -721,11 +721,11 @@ function collectPrecalcWarnings() {
   return issues;
 }
 
-/** Nominal compression outside 20–25% band (RED warning) */
+/** Nominal compression outside 15–25% band (RED warning) */
 function collectNominalCompressionWarning(nominalEntry) {
   if (!nominalEntry) return [];
   const c = nominalEntry.compressionPct;
-  return (c >= 20 && c <= 25) ? [] : [`Nominal compression ${c.toFixed(2)}% is outside the 20–25% band.`];
+  return (c >= 15 && c <= 25) ? [] : [`Nominal compression ${c.toFixed(2)}% is outside the 15–25% band.`];
 }
 
 
@@ -918,10 +918,10 @@ function renderResultsGrid(out, meta, stretchPct){
     const compDisp= compNeg ? 0 : entry.compressionPct;
     const cCls    = (compNeg || !(entry.compressionPct >= 20 && entry.compressionPct <= 25)) ? "oob" : "";
   
-    // Gland Fill: red if >95% or negative; clamp negatives to 0.00
+    // Gland Fill: red if >90% or negative; clamp negatives to 0.00
     const fillNeg = (entry.glandFillPct < 0);
     const fillDisp= fillNeg ? 0 : entry.glandFillPct;
-    const fCls    = (fillNeg || !(entry.glandFillPct <= 95)) ? "oob" : "";
+    const fCls    = (fillNeg || !(entry.glandFillPct <= 90)) ? "oob" : "";
   
     const card = document.createElement("div");
     card.className = "results-panel";
