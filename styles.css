@@ -16,7 +16,7 @@
 
   /* Form layout controls */
   --label-col: 280px;
-  --field-width: 100px;  /* tighter layout */
+  --field-width: 220px;  /* tighter layout */
   --unit-width: 60px;    /* room for °C/°F and mm/in */
   --row-gap:14px;
   --cell-gap:10px;
@@ -169,7 +169,7 @@ body{
 .results-grid{
   display:grid;
   grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
-  gap:7px;
+  gap:3px;
   margin-top:24px;
 }
 .results-panel{
