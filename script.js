@@ -649,7 +649,7 @@ function evaluateWarnings(out){
 
   out.temperatureResults.forEach(t => {
     if (t.compressionPct < 15) warn.push(`Compression ${t.tempC}°C < 15%`);
-    if (t.compressionPct > 30) warn.push(`Compression ${t.tempC}°C > 30%`);
+    if (t.compressionPct > 25) warn.push(`Compression ${t.tempC}°C > 25%`);
     if (t.glandFillPct > 90)   warn.push(`Gland fill ${t.tempC}°C > 90%`);
   });
 
@@ -885,17 +885,17 @@ function renderResultsGrid(out, meta, stretchPct){
     // Display for Stretch is clamped at 0.00 if negative (as requested).
     const sCls = (out.stretchPct < 0) ? "oob" : "";
 
-    // Compression: red if outside 20–25% band OR negative.
+    // Compression: red if outside 15–25% band OR negative.
     // Display: clamp at 0.00 if negative, otherwise show actual.
     const isCompNeg = (t.compressionPct < 0);
     const cDisplay  = (isCompNeg ? 0 : t.compressionPct);
-    const cCls      = (isCompNeg || !(t.compressionPct >= 20 && t.compressionPct <= 25)) ? "oob" : "";
+    const cCls      = (isCompNeg || !(t.compressionPct >= 15 && t.compressionPct <= 25)) ? "oob" : "";
 
-    // Gland Fill: red if >95% OR negative.
+    // Gland Fill: red if >90% OR negative.
     // Display: clamp at 0.00 if negative, otherwise show actual.
     const isFillNeg = (t.glandFillPct < 0);
     const fDisplay  = (isFillNeg ? 0 : t.glandFillPct);
-    const fCls      = (isFillNeg || !(t.glandFillPct <= 95)) ? "oob" : "";
+    const fCls      = (isFillNeg || !(t.glandFillPct <= 90)) ? "oob" : "";
 
     const card = document.createElement("div");
     card.className = "results-panel";
@@ -913,10 +913,10 @@ function renderResultsGrid(out, meta, stretchPct){
   function addOpCard(label, entry){
     if (!entry) return;
   
-    // Compression: red if outside 20–25% or negative; clamp negatives to 0.00
+    // Compression: red if outside 15–25% or negative; clamp negatives to 0.00
     const compNeg = (entry.compressionPct < 0);
     const compDisp= compNeg ? 0 : entry.compressionPct;
-    const cCls    = (compNeg || !(entry.compressionPct >= 20 && entry.compressionPct <= 25)) ? "oob" : "";
+    const cCls    = (compNeg || !(entry.compressionPct >= 15 && entry.compressionPct <= 25)) ? "oob" : "";
   
     // Gland Fill: red if >90% or negative; clamp negatives to 0.00
     const fillNeg = (entry.glandFillPct < 0);
