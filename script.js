@@ -1062,7 +1062,7 @@ document.addEventListener("DOMContentLoaded", () => {
   loadSession();
 
   // 3) Right-panel image (web path; forward slashes)
-  setGlandPlaceholder("./assets/gland-placeholder.png");
+  setGlandPlaceholder("assets/gland-placeholder.png");
 
   // 4) UNIT TOGGLE
   document.querySelectorAll(".unit-toggle .toggle-btn").forEach(btn => {
