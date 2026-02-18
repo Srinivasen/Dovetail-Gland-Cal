@@ -644,7 +644,7 @@ function calculateDovetail(p, tempsList){
 function evaluateWarnings(out){
   const warn = [];
 
-  if (out.stretchPct < 0) warn.push("O‑ring is loose (negative stretch).");
+  if (out.stretchPct < 0) warn.push("O-ring is loose (negative stretch).");
   else if (out.stretchPct > 5) warn.push("Stretch exceeds recommended 5%.");
 
   out.temperatureResults.forEach(t => {
@@ -654,6 +654,95 @@ function evaluateWarnings(out){
   });
 
   return warn;
+}
+
+/* =====================================================================================
+   AMBER (ADVISORY) ALERT ENGINE
+   Supports:
+   A) Compression near edges (15–17% or 23–25%)
+   B) Gland Fill high but ≤ 90% (85–90%)
+   C) Stretch very low but positive (0–1%)
+   D) Temperature-specific borderline conditions
+   E) Geometry inconsistencies (radii vs gland width/depth)
+   ===================================================================================== */
+
+function evaluateAmbers(out, meta, params) {
+  const amber = [];
+
+  /* -----------------------------
+     A) BORDERLINE COMPRESSION
+     ----------------------------- */
+  out.temperatureResults.forEach(item => {
+    const c = item.compressionPct;
+
+    // near lower band: 15%–17%
+    if (c >= 15 && c < 17)
+      amber.push(`Compression at ${item.tempC}°C is near the lower limit (≈${c.toFixed(2)}%).`);
+
+    // near upper band: 23%–25%
+    if (c > 23 && c <= 25)
+      amber.push(`Compression at ${item.tempC}°C is approaching the upper limit (≈${c.toFixed(2)}%).`);
+  });
+
+  /* -----------------------------
+     B) BORDERLINE GLAND FILL (85–90%)
+     ----------------------------- */
+  out.temperatureResults.forEach(item => {
+    const gf = item.glandFillPct;
+    if (gf > 85 && gf <= 90)
+      amber.push(`Gland Fill at ${item.tempC}°C is approaching maximum capacity (≈${gf.toFixed(2)}%).`);
+  });
+
+  /* -----------------------------
+     C) BORDERLINE STRETCH (0–1%)
+     ----------------------------- */
+  if (out.stretchPct >= 0 && out.stretchPct < 1)
+    amber.push(`Stretch is very low (≈${out.stretchPct.toFixed(2)}%). Verify dimensions.`);
+
+  /* -----------------------------
+     D) TEMP-SPECIFIC BORDERLINE BEHAVIOR
+        - Nominal safe, extreme temps borderline
+     ----------------------------- */
+  if (meta.nominal) {
+    const cNom = meta.nominal.compressionPct;
+
+    out.temperatureResults.forEach(item => {
+      if (item.tempC !== AMBIENT) {
+        const cOther = item.compressionPct;
+
+        // borderline at hot/cold but nominal OK
+        if (
+          (cNom >= 15 && cNom <= 25) &&
+          ((cOther >= 15 && cOther < 17) || (cOther > 23 && cOther <= 25))
+        ) {
+          amber.push(
+            `Compression at ${item.tempC}°C is borderline while nominal remains acceptable.`
+          );
+        }
+      }
+    });
+  }
+
+  /* -----------------------------
+     E) GEOMETRIC INCONSISTENCIES
+     ----------------------------- */
+
+  // Very large radii compared to gland width/depth (not failure, just advisory)
+  if (params.rTop > params.gw * 0.40)
+    amber.push(`Top radius appears large compared to gland width (r₁ = ${params.rTop}).`);
+
+  if (params.rBottom > params.gw * 0.40)
+    amber.push(`Bottom radius appears large compared to gland width (r₂ = ${params.rBottom}).`);
+
+  // Gap too small relative to CS can cause installation difficulty
+  if (params.gap < params.cs * 0.02)
+    amber.push(`Gap (e) is very small relative to O‑ring cross‑section.`);
+
+  // Gland angle almost zero → warn about machining tolerance issues
+  if (Math.abs(params.angle) < 1)
+    amber.push(`Gland angle is extremely small; verify machining tolerances.`);
+
+  return amber;
 }
 
 /** Read a temperature field's original value in °C (originals are canonical °C) */
@@ -725,7 +814,7 @@ function collectPrecalcWarnings() {
 function collectNominalCompressionWarning(nominalEntry) {
   if (!nominalEntry) return [];
   const c = nominalEntry.compressionPct;
-  return (c >= 15 && c <= 25) ? [] : [`Nominal compression ${c.toFixed(2)}% is outside the 15–25% band.`];
+  return (c >= 15 && c <= 25) ? [] : [`Nominal compression ${c.toFixed(2)}% is outside the 15-25% band.`];
 }
 
 
@@ -1010,7 +1099,8 @@ function runCalculation(){
   renderWarningsBanner(redWarnings);
 
   // For now, no amber alerts; framework ready if you want advisory items
-  renderAlertsBanner([]);
+  const amberAlerts = evaluateAmbers(out, meta, params);
+  renderAlertsBanner(amberAlerts);
 
   // 7) Render results
   renderResultsGrid(out, meta, out.stretchPct);
