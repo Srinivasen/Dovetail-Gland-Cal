@@ -1,0 +1,404 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <!-- ==================================================================================
+       META & TITLE
+       ----------------------------------------------------------------------------------
+       - Keep the favicon commented until a file is provided.
+       - styles.css contains the global theme and layout tokens.
+       ================================================================================== -->
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Dovetail Gland Calculator</title>
+  <!-- favicon.ico -->
+  <!--link rel="icon" type="image/x-icon" href="./favicon.ico" /-->
+  <!-- styles.css -->
+  <link href="./styles.css" rel="stylesheet" />
+</head>
+<body>
+  <!-- ==================================================================================
+       HEADER
+       ================================================================================== -->
+  <div class="header">
+    <div class="hamburger"><div></div><div></div><div></div></div>
+    <div class="logo">TRELLEBORG</div>
+  </div>
+
+  <div class="page-wrap">
+    <!-- ==================================================================================
+         PAGE TITLE + TOGGLES
+         ================================================================================== -->
+    <div class="top-row">
+      <div class="big-title">O-Ring / Gland Analysis Tool</div>
+
+      <div class="toggle-group">
+        <!-- Units -->
+        <div>
+          <div class="toggle-label">Units</div>
+          <div class="toggle-buttons unit-toggle">
+            <button class="toggle-btn active" data-val="in">Inch</button>
+            <button class="toggle-btn" data-val="mm">Millimeter</button>
+          </div>
+        </div>
+
+        <!-- Temperature -->
+        <div>
+          <div class="toggle-label">Temperature</div>
+          <div class="toggle-buttons temp-toggle">
+            <button class="toggle-btn active" data-val="c">Celsius</button>
+            <button class="toggle-btn" data-val="f">Fahrenheit</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="section-subtitle">Gland Size Calculator</div>
+
+    <!-- ==================================================================================
+         MAIN WORK AREA: TWO-COLUMN ROW
+         ----------------------------------------------------------------------------------
+         Left  = Input form (unchanged field IDs)
+         Right = Placeholder image + Accordion (Parameters / Gland Type Details / O-Ring Sizing)
+         ================================================================================== -->
+    <div class="top-flex">
+
+      <!-- ================================================================================
+           LEFT PANEL — INPUT FORM
+           ================================================================================ -->
+      <div class="panel left-panel">
+        <div class="form-grid">
+          <!-- Gland Width -->
+          <div class="label tooltip-container">
+            Gland Width (b)*
+            <span class="info-icon">i</span>
+            <div class="tooltip">Width of the gland base.</div>
+          </div>
+          <div class="input-cell right-pack">
+            <input class="field mandatory" id="glandWidth" type="number">
+            <span class="unit-text unit-lbl">in</span>
+          </div>
+          <div class="input-hint"><div id="hint_glandWidth" class="hint"></div></div>
+
+          <!-- Gland Depth -->
+          <div class="label tooltip-container">
+            Gland Depth (h) *
+            <span class="info-icon">i</span>
+            <div class="tooltip">Vertical depth of the gland.</div>
+          </div>
+          <div class="input-cell right-pack">
+            <input class="field mandatory" id="glandDepth" type="number">
+            <span class="unit-text unit-lbl">in</span>
+          </div>
+          <div class="input-hint"><div id="hint_glandDepth" class="hint"></div></div>
+
+          <!-- Gland Angle -->
+          <div class="label tooltip-container">
+            Gland Angle (a)*
+            <span class="info-icon">i</span>
+            <div class="tooltip">Side‑wall taper angle.</div>
+          </div>
+          <div class="input-cell right-pack">
+            <input class="field mandatory" id="glandAngle" step="0.1" type="number">
+            <span class="unit-text">deg</span>
+          </div>
+          <div class="input-hint"><div id="hint_glandAngle" class="hint"></div></div>
+
+          <!-- Top Radius -->
+          <div class="label tooltip-container">
+            <p>Top Radius (r<sub>1</sub>)*</p>
+            <span class="info-icon">i</span>
+            <div class="tooltip">Top corner radius.</div>
+          </div>
+          <div class="input-cell right-pack">
+            <input class="field mandatory" id="glandTopR" type="number">
+            <span class="unit-text unit-lbl">in</span>
+          </div>
+          <div class="input-hint"><div id="hint_glandTopR" class="hint"></div></div>
+
+          <!-- Bottom Radius -->
+          <div class="label tooltip-container">
+            <p>Bottom Radius (r<sub>2</sub>)*</p>
+            <span class="info-icon">i</span>
+            <div class="tooltip">Bottom corner radius.</div>
+          </div>
+          <div class="input-cell right-pack">
+            <input class="field mandatory" id="glandBottomR" type="number">
+            <span class="unit-text unit-lbl">in</span>
+          </div>
+          <div class="input-hint"><div id="hint_glandBottomR" class="hint"></div></div>
+
+          <!-- Gap -->
+          <div class="label tooltip-container">
+            Gap (e)*
+            <span class="info-icon">i</span>
+            <div class="tooltip">Gap between mating parts.</div>
+          </div>
+          <div class="input-cell right-pack">
+            <input class="field mandatory" id="gap" type="number">
+            <span class="unit-text unit-lbl">in</span>
+          </div>
+          <div class="input-hint"><div id="hint_gap" class="hint"></div></div>
+
+          <!-- Gland Centerline -->
+          <div class="label tooltip-container">
+            Gland Centerline (c)*
+            <span class="info-icon">i</span>
+            <div class="tooltip">Gland circumferential centerline.</div>
+          </div>
+          <div class="input-cell right-pack">
+            <input class="field mandatory" id="glandCenterline" type="number">
+            <span class="unit-text unit-lbl">in</span>
+          </div>
+          <div class="input-hint"><div id="hint_glandCenterline" class="hint"></div></div>
+
+          <!-- O‑Ring Cross Section -->
+          <div class="label tooltip-container">
+            <p>O-Ring Cross Section (d<sub>2</sub>)*</p>
+            <span class="info-icon">i</span>
+            <div class="tooltip">O‑Ring cross‑section diameter.</div>
+          </div>
+          <div class="input-cell right-pack">
+            <input class="field mandatory" id="oringCS" type="number">
+            <span class="unit-text unit-lbl">in</span>
+          </div>
+          <div class="input-hint"><div id="hint_oringCS" class="hint"></div></div>
+
+          <!-- O‑Ring ID -->
+          <div class="label tooltip-container">
+            O-Ring Internal Diameter *
+            <span class="info-icon">i</span>
+            <div class="tooltip">Inner diameter of the O-Ring.</div>
+          </div>
+          <div class="input-cell right-pack">
+            <input class="field mandatory" id="oringID" type="number">
+            <span class="unit-text unit-lbl">in</span>
+          </div>
+          <div class="input-hint"><div id="hint_oringID" class="hint"></div></div>
+
+          <!-- Operating Temperature (Min/Nominal/Max) -->
+          <div class="label tooltip-container">
+            Operating Temperature
+            <span class="info-icon">i</span>
+            <div class="tooltip">Enter Min/Nominal/Max operating temperatures (all optional).</div>
+          </div>
+          <div class="input-cell right-pack temp-block">
+            <div class="temp-headers">
+              <div class="temp-hdr">Min</div>
+              <div class="temp-hdr">Nominal</div>
+              <div class="temp-hdr">Max</div>
+              <div class="temp-hdr"> </div>
+            </div>
+            <div class="temp-inputs">
+              <input class="field temp-field" id="tempMin" type="number">
+              <input class="field temp-field" id="tempNom" type="number">
+              <input class="field temp-field" id="tempMax" type="number">
+              <span class="temp-unit-final unit-text">°C</span>
+            </div>
+          </div>
+          <div class="input-hint"><div id="hint_tempMin" class="hint"></div></div>
+          <div class="input-hint"><div id="hint_tempNom" class="hint"></div></div>
+          <div class="input-hint"><div id="hint_tempMax" class="hint"></div></div>
+
+          <!-- Material Group -->
+          <div class="label tooltip-container">
+            O-Ring Material Group *
+            <span class="info-icon">i</span>
+            <div class="tooltip">Select the O-Ring material. This auto-populates α and hardness options.</div>
+          </div>
+          <div class="input-cell right-pack">
+            <select class="dropdown wide" id="oringMaterialGroup">
+              <option value="">Select</option>
+              <option>FFKM</option>
+              <option>FKM</option>
+              <option>NBR</option>
+              <option>VMQ</option>
+              <option>HNBR</option>
+              <option>EPDM</option>
+              <option>PU</option>
+              <option>ACM</option>
+              <option>CR</option>
+              <option>FVMQ</option>
+              <option>NR</option>
+              <option>IIR</option>
+              <option>SBR</option>
+            </select>
+            <span class="unit-text"></span>
+          </div>
+
+          <!-- Linear Thermal Expansion Coefficient -->
+          <div class="label tooltip-container hide-cte">
+            Linear Thermal Expansion Coefficient *
+            <span class="info-icon">i</span>
+            <div class="tooltip">
+              Unitless linear CTE for thermal growth. You can type scientific notation (e.g., 316e-6).
+            </div>
+          </div>
+          <div class="input-cell right-pack hide-cte">
+            <input class="field mandatory" id="alpha" type="number" step="any">
+            <span class="unit-text" id="alphaAppDisplay"></span>
+          </div>
+          <div class="input-hint"><div id="hint_alpha" class="hint"></div></div>
+
+          <!-- O‑Ring Hardness (IRHD) -->
+          <div class="label tooltip-container">
+            O-Ring Hardness (IRHD)
+            <span class="info-icon">i</span>
+            <div class="tooltip">Material hardness</div>
+          </div>
+          <div class="input-cell right-pack">
+            <select class="dropdown wide" id="oringHardness">
+              <option value="">Select</option>
+            </select>
+            <span class="unit-text"></span>
+          </div>
+        </div>
+
+        <!-- FORM ACTIONS -->
+        <div class="actions centered">
+          <button id="openAs568Btn" class="action-btn ghost">AS568 O-Ring Sizes</button>
+          <button id="calculateBtn" class="action-btn" disabled>Calculate</button>
+          <button id="resetBtn" class="action-btn ghost">Reset</button>
+          <button id="exportBtn" class="action-btn ghost" type="button">Export PDF</button>
+        </div>
+      </div> <!-- /left-panel -->
+
+      <!-- ================================================================================
+           RIGHT PANEL — PLACEHOLDER + ACCORDION
+           ================================================================================ -->
+      <div class="panel right-panel">
+        <div class="results-header">Gland Information</div>
+        <!-- Placeholder image area -->
+        <div class="gland-ph">
+          <!-- Your placeholder already exists under /assets -->
+          <!--./assets/gland-placeholder.png -->
+          <img id="glandPlaceholder" alt="Gland diagram placeholder" style="max-width:100%;height:auto"/>
+          <div class="ph-hint" id="glandPlaceholderHint" style=" display:none;">
+            <!-- hidden because image is present -->
+            Provide a placeholder URL in script if this is removed.
+          </div>
+        </div>
+        
+        <!-- Accordion (content to be filled in subsequent steps) -->
+        <!--div class="accordion" id="glandAccordion" role="region" aria-label="Gland information details"-->
+          <!-- Item 1: Parameters -->
+          <!--section class="acc-item">
+            <button class="acc-head" type="button"
+                    aria-expanded="false"
+                    aria-controls="acc-panel-params"
+                    id="acc-btn-params">
+              <span class="acc-title">Parameters</span>
+              <span class="acc-icon" aria-hidden="true">+</span>
+            </button>
+            <div class="acc-panel" id="acc-panel-params" role="region" aria-labelledby="acc-btn-params" hidden>
+              <div class="acc-content">
+                <p>We’ll add the Parameters content here next.</p>
+              </div>
+            </div>
+          </section-->
+          <!-- Item 2: Gland Type Details -->
+          <!--section class="acc-item">
+            <button class="acc-head" type="button"
+                    aria-expanded="false"
+                    aria-controls="acc-panel-gland"
+                    id="acc-btn-gland">
+              <span class="acc-title">Gland Type Details</span>
+              <span class="acc-icon" aria-hidden="true">+</span>
+            </button>
+            <div class="acc-panel" id="acc-panel-gland" role="region" aria-labelledby="acc-btn-gland" hidden>
+              <div class="acc-content">
+                <p>We’ll add the Gland Type Details here next.</p>
+              </div>
+            </div>
+          </section-->
+          <!-- Item 3: O-Ring Sizing -->
+          <!--section class="acc-item">
+            <button class="acc-head" type="button"
+                    aria-expanded="false"
+                    aria-controls="acc-panel-oring"
+                    id="acc-btn-oring">
+              <span class="acc-title">O-Ring Sizing</span>
+              <span class="acc-icon" aria-hidden="true">+</span>
+            </button>
+            <div class="acc-panel" id="acc-panel-oring" role="region" aria-labelledby="acc-btn-oring" hidden>
+              <div class="acc-content">
+                <p>We’ll add the O-Ring Sizing content here next.</p>
+              </div>
+            </div>
+          </section-->
+        <!--/div--> <!-- /accordion -->
+
+      </div> <!-- /right-panel -->
+
+    </div> <!-- /top-flex -->
+
+    <!-- ==================================================================================
+         MESSAGING BANDS (PLACEMENT: BEFORE RESULTS)
+         ----------------------------------------------------------------------------------
+         - Warnings (engineering): RED banner, with warning symbol(s), no title.
+         - Alerts (attention/advisory): AMBER banner, ⚠️ + black text, no title.
+         ================================================================================== -->
+    
+    <!-- ALERTS (AMBER) -->
+    <div id="alertsBanner"
+         class="alerts-banner"
+         role="alert"
+         aria-live="assertive"
+         style="display:none;">
+      <!-- JS injects: <div class="alert-item"><span class="alert-icon">⚠️</span><span>message</span></div> -->
+    </div>
+
+    <!-- WARNINGS (RED) -->
+    <div id="warningsBanner"
+         class="warnings-banner"
+         role="status"
+         aria-live="polite"
+         style="display:none;">
+      <!-- JS injects: <div class="warn-item"><span class="warn-icon">❗</span><span>message</span></div> -->
+    </div>
+
+    <!-- ==================================================================================
+         RESULTS GRID (CARDS)
+         ----------------------------------------------------------------------------------
+         NOTE: We’ll clamp Stretch DISPLAY to 0.00% if negative (calculation stays true).
+         ================================================================================== -->
+    <div id="resultsGrid" class="results-grid"></div>
+
+    <!-- (Removed) OLD ENGINEERING WARNINGS PANEL
+         Intentionally deleted:
+         <div class="panel" id="warningPanel"> ... </div>
+    -->
+  </div> <!-- /page-wrap -->
+
+  <!-- ====================================================================================
+       AS568 MODAL
+       ==================================================================================== -->
+  <div id="as568Modal" class="modal-overlay" style="display:none;">
+    <div class="modal">
+      <div class="modal-header">AS568 O-Ring Sizes</div>
+      <div class="modal-table-wrap">
+        <!-- Search input -->
+        <input id="as568Search" type="text"
+               placeholder="Search dash, CS, or ID…"
+               class="field"
+               style="width:260px;margin-bottom:8px;">
+        <table class="modal-table">
+          <thead>
+            <tr>
+              <th>Dash Size</th>
+              <th>O-Ring Cross Section Size</th>
+              <th>O-Ring Internal Diameter Size</th>
+            </tr>
+          </thead>
+          <tbody id="as568Tbody"></tbody>
+        </table>
+      </div>
+      <div class="modal-actions">
+        <button id="as568AddBtn" class="action-btn" disabled>Add Selected</button>
+        <button id="as568CancelBtn" class="action-btn ghost">Cancel</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="./script.js"></script>
+</body>
+</html>
