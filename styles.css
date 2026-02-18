@@ -1,0 +1,410 @@
+/* =====================================================================================
+   THEME TOKENS & GLOBALS
+   -------------------------------------------------------------------------------------
+   - Central design tokens shared across panels and components.
+   - Tweak radii, colors, and control widths here.
+   ===================================================================================== */
+:root{
+  --primary:#2563eb;
+  --primary-light:#dbeafe;
+  --bg:#f4f5f7;
+  --panel:#ffffff;
+  --border:#e5e7eb;
+  --text-dark:#111827;
+  --text-light:#6b7280;
+  --radius:10px;
+
+  /* Form layout controls */
+  --label-col: 280px;
+  --field-width: 220px;  /* tighter layout */
+  --unit-width: 60px;    /* room for °C/°F and mm/in */
+  --row-gap:14px;
+  --cell-gap:10px;
+}
+
+body{
+  margin:0;
+  background:var(--bg);
+  font-family:"Inter",sans-serif;
+  color:var(--text-dark);
+}
+
+/* =====================================================================================
+   HEADER
+   ===================================================================================== */
+.header{background:#000;padding:14px 24px;display:flex;align-items:center;color:#fff;}
+.hamburger{width:26px;height:20px;display:flex;flex-direction:column;justify-content:space-between;}
+.hamburger div{height:3px;background:#fff;border-radius:3px;}
+.logo{margin-left:auto;color:#38bdf8;font-weight:bold;}
+
+/* =====================================================================================
+   PAGE WRAPPER & TITLES
+   ===================================================================================== */
+.page-wrap{max-width:1500px;margin:24px auto;padding:0 20px;}
+.top-row{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;}
+.big-title{font-size:28px;font-weight:700;}
+.section-subtitle{font-size:18px;color:var(--text-light);margin:10px 0 20px;}
+
+/* =====================================================================================
+   TOGGLES (Units / Temperature)
+   ===================================================================================== */
+.toggle-group{display:flex;align-items:center;gap:40px;}
+.toggle-label{font-weight:600;font-size:14px;margin-bottom:6px;}
+.toggle-buttons{display:flex;background:var(--primary-light);padding:6px;border-radius:var(--radius);}
+.toggle-btn{padding:8px 18px;font-weight:500;background:none;border:none;border-radius:var(--radius);cursor:pointer;}
+.toggle-btn.active{background:var(--primary);color:#fff;}
+
+/* =====================================================================================
+   PANELS
+   ===================================================================================== */
+.panel{
+  background:var(--panel);
+  border:1px solid var(--border);
+  border-radius:var(--radius);
+  padding:24px;
+}
+.panel-title{font-size:18px;font-weight:600;margin-bottom:12px;}
+
+/* =====================================================================================
+   LEFT PANEL — FORM GRID (labels left, fields right)
+   ===================================================================================== */
+.form-grid{
+  display:grid;
+  grid-template-columns: var(--label-col) 1fr;
+  row-gap: var(--row-gap);
+  align-items:center;
+}
+.label{
+  font-weight:600;
+  font-size:14px;
+  display:flex;
+  align-items:center;
+  gap:6px;
+  white-space:nowrap;
+}
+
+/* Tooltip */
+.tooltip-container{position:relative;display:flex;align-items:center;gap:4px;}
+.info-icon{
+  width:16px;height:16px;border-radius:50%;
+  background:#e2e8f0;color:#111;font-size:11px;
+  display:flex;align-items:center;justify-content:center;cursor:pointer;
+}
+.tooltip{
+  position:absolute;top:120%;left:0;
+  background:#111;color:#fff;padding:8px 10px;border-radius:6px;
+  width:max(220px,28ch);opacity:0;visibility:hidden;transform:translateY(-4px);
+  transition:all .15s ease;white-space:normal;z-index:20;box-shadow:0 4px 12px rgba(0,0,0,.25);
+}
+.tooltip-container:hover .tooltip{opacity:1;visibility:visible;transform:translateY(0);}
+
+/* Inputs */
+.input-cell{display:flex;align-items:center;gap: var(--cell-gap);}
+.right-pack{justify-content:flex-end;}
+.field,.temp-field,.dropdown{
+  width: var(--field-width);
+  height: 34px;
+  padding: 6px 10px;
+  border:1px solid var(--border);
+  border-radius:6px;
+  font-size:14px;
+  background:#fff;
+  box-sizing:border-box;
+}
+.dropdown.wide{width: var(--field-width);}
+.unit-text{
+  width: var(--unit-width);
+  color: var(--text-light);
+  font-weight:600;
+}
+
+/* Operating Temperature block (Min/Nom/Max) */
+.temp-block{
+  display:flex;
+  flex-direction:column;
+  align-items:flex-end;
+  gap:8px;
+  min-width: calc(var(--field-width)*3 + var(--unit-width) + var(--cell-gap)*3);
+}
+.temp-headers,.temp-inputs{
+  display:grid;
+  grid-template-columns: var(--field-width) var(--field-width) var(--field-width) var(--unit-width);
+  column-gap: var(--cell-gap);
+  justify-items:center;
+  align-items:center;
+}
+.temp-inputs .field,.temp-inputs .dropdown{
+  width: var(--field-width);
+  min-width: var(--field-width);
+  box-sizing: border-box;
+}
+.temp-hdr{font-weight:600;color:var(--text-light);font-size:13px;}
+
+/* Hide CTE on screen and print (explicit via class) */
+.hide-cte { display: none; }
+
+/* Buttons below the form */
+.actions{display:flex;justify-content:center;gap:20px;margin-top:20px;}
+.action-btn{padding:10px 20px;border-radius:6px;background:var(--primary);color:#fff;font-weight:600;cursor:pointer;border:none;}
+.action-btn.ghost{background:#e5e7eb;color:#111;}
+.action-btn.disabled,.action-btn:disabled{background:#cbd5e1 !important;cursor:not-allowed !important;}
+#exportBtn.disabled,
+#exportBtn:disabled {
+  background: #cbd5e1 !important;
+  cursor: not-allowed !important;
+}
+
+/* =====================================================================================
+   INLINE HINTS (non-blocking field advisories)
+   ===================================================================================== */
+.hint { margin-top: 4px; font-size: 12px; color: #b91c1c; display: none; }
+.hint.warn { color: #b45309; }
+.field.is-invalid, .temp-field.is-invalid { border-color: #fca5a5; }
+.field.is-warn, .temp-field.is-warn { border-color: #fbbf24; }
+.input-hint { grid-column: 2 / 3; justify-self: end; width: calc(var(--field-width) + var(--unit-width) + var(--cell-gap)); }
+
+/* =====================================================================================
+   RESULTS GRID (dynamic cards)
+   ===================================================================================== */
+.results-grid{
+  display:grid;
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  gap:24px;
+  margin-top:24px;
+}
+.results-panel{
+  background:#fff;
+  border:1px solid var(--border);
+  border-radius:10px;
+  overflow:hidden;
+}
+.results-header{background:#757575;color:#fff;padding:12px;font-weight:600;}
+.results-subheader{background:#fafafa;text-align:center;padding:12px;font-weight:700;}
+.results-row{display:flex;justify-content:space-between;padding:14px;border-bottom:1px solid #eee;font-size:14px;}
+
+/* Out-of-bounds emphasis inside cards (values only) */
+.oob { color:#b91c1c; font-weight:700; }
+
+/* =====================================================================================
+   RESPONSIVE — Temperature block stacks when narrow
+   ===================================================================================== */
+@media (max-width: 900px){
+  .temp-block{align-items:stretch;min-width:0;}
+  .temp-headers,.temp-inputs{grid-template-columns:1fr;row-gap:6px;justify-items:start;}
+  .temp-inputs .field,.temp-inputs .dropdown{width:100%;min-width:0;}
+  .temp-unit-final{justify-self:end;}
+}
+
+/* =====================================================================================
+   AS568 MODAL (pop-up: table of standard sizes)
+   ===================================================================================== */
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.45);
+  display: none;
+  z-index: 9999;
+}
+.modal {
+  width: min(900px, 92vw);
+  max-height: 80vh;
+  margin: 6vh auto;
+  background: white;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.modal-header {
+  background: #3f3f46;
+  color: white;
+  padding: 14px 16px;
+  font-weight: 700;
+  text-align: center;
+}
+.modal-table-wrap {
+  padding: 14px;
+  overflow-y: auto;
+  flex: 1;
+}
+.modal-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+.modal-table th {
+  background: #c8b27a;
+  position: sticky;
+  top: 0;
+  padding: 10px 8px;
+  text-align: left;
+  border-bottom: 1px solid #ddd;
+}
+.modal-table td {
+  padding: 8px;
+  border-bottom: 1px solid #eee;
+}
+.modal-table tbody tr:hover { background: #f3f4f6; }
+.modal-table tbody tr.selected { background: #dbeafe; }
+.modal-actions {
+  padding: 14px;
+  display: flex;
+  gap: 12px;
+  justify-content: center;
+  border-top: 1px solid #ddd;
+}
+
+/* =====================================================================================
+   PRINT STYLES (Export to PDF)
+   ===================================================================================== */
+@media print {
+  body { -webkit-print-color-adjust: exact; print-color-adjust: exact; background: #fff; }
+  .header, .toggle-group, .panel .actions { display: none !important; }
+  .panel, .results-panel { border-color: #ddd; }
+  .results-grid { grid-template-columns: 1fr 1fr; gap: 12px; }
+  /* Show banners if present */
+  .warnings-banner, .alerts-banner { display: block !important; }
+  .page-wrap { max-width: 100%; padding: 0 10mm; }
+}
+
+/* =====================================================================================
+   LAYOUT: TWO-COLUMN ROW (LEFT FORM + RIGHT PANEL)
+   -------------------------------------------------------------------------------------
+   - Keep side-by-side down to ~900px; then stack vertically.
+   - Slightly narrower right panel to reduce early wrapping.
+   ===================================================================================== */
+.top-flex{
+  display: grid;
+  grid-template-columns: minmax(560px, 1fr) 380px; /* left flexible, right fixed */
+  gap: 20px;
+  align-items: start;
+  margin-bottom: 24px;
+}
+.left-panel { /* semantic hook if needed */ }
+.right-panel{ /* semantic hook if needed */ }
+
+@media (max-width: 900px){
+  .top-flex { grid-template-columns: 1fr; }
+}
+
+/* =====================================================================================
+   RIGHT PANEL: PLACEHOLDER IMAGE AREA
+   -------------------------------------------------------------------------------------
+   - Displays your uploaded placeholder (./assets/gland-placeholder.png).
+   - The hint hides automatically when an <img src> is present.
+   ===================================================================================== */
+.gland-ph {
+  margin-top: 12px;
+  border: 1px dashed var(--border);
+  border-radius: 8px;
+  background: #fafafa;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 220px;
+  position: relative;
+  overflow: hidden;
+}
+.gland-ph img {
+  max-width: 100%;
+  height: auto;
+  display: block;
+}
+.gland-ph .ph-hint {
+  position: absolute;
+  inset: auto 0 10px 0;
+  text-align: center;
+  color: var(--text-light);
+  font-size: 12px;
+}
+
+/* =====================================================================================
+   ACCORDION (Parameters / Gland Type Details / O-Ring Sizing)
+   -------------------------------------------------------------------------------------
+   - Accessible structure: button[aria-expanded] + region[hidden].
+   - Minimal styling; content comes later in JS steps.
+   ===================================================================================== */
+/*
+.accordion {
+  margin-top: 16px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  overflow: hidden;
+}
+.acc-item + .acc-item { border-top: 1px solid var(--border); }
+
+.acc-head {
+  width: 100%;
+  padding: 12px 14px;
+  background: #f8fafc;
+  border: none;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  cursor: pointer;
+  text-align: left;
+  font-weight: 700;
+  color: var(--text-dark);
+}
+.acc-head:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+}
+.acc-title { font-size: 14px; }
+.acc-icon  { font-weight: 900; color: #111; width: 20px; text-align: center; }
+.acc-head[aria-expanded="true"] .acc-icon { content: "-"; }
+
+.acc-panel  { padding: 12px 14px; background: #fff; }
+.acc-content{ font-size: 14px; color: var(--text-dark); }
+*/
+
+/* Optional micro-animations for future height transitions */
+.acc-panel { transition: height .18s ease, opacity .18s ease; }
+
+/* =====================================================================================
+   MESSAGING BANNERS (PLACED BEFORE RESULTS)
+   -------------------------------------------------------------------------------------
+   - Warnings (engineering): RED banner; each line shows ❗ + message.
+   - Alerts (advisory): AMBER banner; each line shows ⚠️ + black text.
+   - JS will control visibility (display:block/none).
+   ===================================================================================== */
+
+/* RED Warnings */
+.warnings-banner{
+  margin: 16px 0 12px 0;
+  padding: 12px 14px;
+  border: 1px solid #fecaca;      /* red-200 border */
+  background: #fee2e2;            /* red-100 background */
+  color: #7f1d1d;                 /* red-900 text for contrast */
+  border-radius: 8px;
+}
+.warnings-banner .warn-item{
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin: 6px 0;
+}
+.warnings-banner .warn-icon{
+  font-weight: 700;
+  line-height: 1;
+}
+
+/* AMBER Alerts (⚠️ + black text) */
+.alerts-banner{
+  margin: 0 0 16px 0;
+  padding: 12px 14px;
+  border: 1px solid #fcd34d;      /* amber-300 border */
+  background: #fffbeb;            /* amber-50 background */
+  color: #111;                    /* black text as requested */
+  border-radius: 8px;
+}
+.alerts-banner .alert-item{
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin: 6px 0;
+}
+.alerts-banner .alert-icon{
+  font-weight: 700;
+  line-height: 1;
+}
