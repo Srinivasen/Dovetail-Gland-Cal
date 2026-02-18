@@ -16,7 +16,7 @@
 
   /* Form layout controls */
   --label-col: 280px;
-  --field-width: 220px;  /* tighter layout */
+  --field-width: 100px;  /* tighter layout */
   --unit-width: 60px;    /* room for °C/°F and mm/in */
   --row-gap:14px;
   --cell-gap:10px;
