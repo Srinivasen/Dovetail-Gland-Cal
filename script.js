@@ -12,8 +12,8 @@
    ===================================================================================== */
 
 /** File locations for AS568 data */
-const AS568_MM_CSV_URL = "./data/as568_mm.csv";
-const AS568_IN_CSV_URL = "./data/as568_in.csv";
+const AS568_MM_CSV_URL = "data/as568_mm.csv";
+const AS568_IN_CSV_URL = "data/as568_in.csv";
 
 /** Unit settings (length + temperature) */
 let unit = "in";      // “in” | “mm”
