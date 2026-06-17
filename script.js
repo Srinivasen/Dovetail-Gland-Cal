@@ -277,8 +277,8 @@ const HINTS = {
   glandBottomR:   { min: -Infinity, warnMin: 0, msg: "Radius is negative; verify." },
   gap:            { min: -Infinity, warnMin: 0, msg: "Gap is negative; verify." },
   glandCenterline:{ min: -Infinity, warnMin: 0, msg: "Centerline is negative; verify." },
-  oringCS:        { min: -Infinity, warnMin: 0, msg: "Cross‑section is negative; verify." },
-  oringID:        { min: -Infinity, warnMin: 0, msg: "O‑ring ID is negative; verify." },
+  oringCS:        { min: -Infinity, warnMin: 0, msg: "Cross-section is negative; verify." },
+  oringID:        { min: -Infinity, warnMin: 0, msg: "O-ring ID is negative; verify." },
   alpha:          { min: 0, msg: "CTE should normally be ≥ 0. Check units/value." },
   tempMin:  {},
   tempNom:  {},
@@ -598,14 +598,33 @@ function circularSegmentArea(r, angle){
   return r*r*Math.acos((r-h)/r) - (r-h)*Math.sqrt(2*r*h - h*h);
 }
 
+/** Tangential radius area correction for a corner blend */
+function cornerRadiusDelta(r, angleDeg) {
+  if (r <= 0) return 0;
+  const alphaRad = (angleDeg * PI) / 180;
+  
+  // Half-angle of the corner profile intersection
+  const halfAngle = alphaRad / 2; 
+  
+  // Area between sharp intersection point and the tangential arc blend
+  // Area of the sharp triangular corner tip
+  const sharpArea = r * r / Math.tan(halfAngle);
+
+  // Area of the smooth circular sector blending into that corner
+  const arcArea = PI * r * r * ((180 - angleDeg) / 360);
+  
+  // The delta area difference
+  return sharpArea - arcArea;
+}
+
 /** Dovetail cross-section area (simplified model) */
 function dovetailCrossSection(gw, gd, ang, rTop, rBottom, gap){
   const angRad = ang * PI/180;
   const topWidth = gw + 2 * (gd / Math.tan(angRad));
   const A_trap   = 0.5 * (gw + topWidth) * gd;
-  const A_top    = 2 * circularSegmentArea(rTop, ang);
-  const A_bottom = 2 * circularSegmentArea(rBottom, ang);
-  const A_gap    = (gw + 2*rTop) * gap;
+  const A_top = 2 * cornerRadiusDelta(rTop, ang);
+  const A_bottom = 2 * cornerRadiusDelta(rBottom, ang);
+  const A_gap = gw * gap;
   return A_trap + A_top - A_bottom + A_gap;
 }
 
@@ -641,16 +660,44 @@ function calculateDovetail(p, tempsList){
 }
 
 /** Warning rules (engineering) */
-function evaluateWarnings(out){
+function evaluateWarnings(out, p){
   const warn = [];
 
-  if (out.stretchPct < 0) warn.push("O-ring is loose (negative stretch).");
-  else if (out.stretchPct > 5) warn.push("Stretch exceeds recommended 5%.");
+  // Stretch violations
+  if (out.stretchPct < 0) {
+    warn.push({ id:"R_STRETCH_NEG", text:"Negative stretch (loose O-ring)." });
+  } else if (out.stretchPct > 5) {
+    warn.push({ id:"R_STRETCH_HIGH", text:"Stretch exceeds recommended 5%." });
+  }
 
+  // Gland Angle Severity
+  if (p && (p.angle < 45 || p.angle > 75)) {
+    warn.push({ id:"R_ANGLE_RANGE", text:"Dovetail angle outside acceptable 45-75° range." });
+  }
+
+  // Compression & gland fill violations (any temperature)
   out.temperatureResults.forEach(t => {
-    if (t.compressionPct < 15) warn.push(`Compression ${t.tempC}°C < 15%`);
-    if (t.compressionPct > 25) warn.push(`Compression ${t.tempC}°C > 25%`);
-    if (t.glandFillPct > 90)   warn.push(`Gland fill ${t.tempC}°C > 90%`);
+    if (t.compressionPct < 15) {
+      warn.push({
+        id: "R_COMP_LOW",
+        temps: [t.tempC],
+        text: "Compression below 15%."
+      });
+    }
+    if (t.compressionPct > 25) {
+      warn.push({
+        id: "R_COMP_HIGH",
+        temps: [t.tempC],
+        text: "Compression above 25%."
+      });
+    }
+    if (t.glandFillPct > 90) {
+      warn.push({
+        id: "R_GF_HIGH",
+        temps: [t.tempC],
+        text: "Gland fill exceeds 90%."
+      });
+    }
   });
 
   return warn;
@@ -666,81 +713,71 @@ function evaluateWarnings(out){
    E) Geometry inconsistencies (radii vs gland width/depth)
    ===================================================================================== */
 
-function evaluateAmbers(out, meta, params) {
+function evaluateAmbers(out, meta, p) {
   const amber = [];
+  const csIn = unit === "in" ? p.cs : p.cs / IN_TO_MM;
 
-  /* -----------------------------
-     A) BORDERLINE COMPRESSION
-     ----------------------------- */
-  out.temperatureResults.forEach(item => {
-    const c = item.compressionPct;
+  /* ---------- Borderline compression ---------- */
+  out.temperatureResults.forEach(t => {
+    if (t.compressionPct >= 15 && t.compressionPct < 17)
+      amber.push({ id:"A_COMP_LOW_EDGE", temps:[t.tempC], text:"Compression near lower acceptable limit." });
 
-    // near lower band: 15%–17%
-    if (c >= 15 && c < 17)
-      amber.push(`Compression at ${item.tempC}°C is near the lower limit (≈${c.toFixed(2)}%).`);
-
-    // near upper band: 23%–25%
-    if (c > 23 && c <= 25)
-      amber.push(`Compression at ${item.tempC}°C is approaching the upper limit (≈${c.toFixed(2)}%).`);
+    if (t.compressionPct > 23 && t.compressionPct <= 25)
+      amber.push({ id:"A_COMP_HIGH_EDGE", temps:[t.tempC], text:"Compression approaching upper limit." });
   });
 
-  /* -----------------------------
-     B) BORDERLINE GLAND FILL (85–90%)
-     ----------------------------- */
-  out.temperatureResults.forEach(item => {
-    const gf = item.glandFillPct;
-    if (gf > 85 && gf <= 90)
-      amber.push(`Gland Fill at ${item.tempC}°C is approaching maximum capacity (≈${gf.toFixed(2)}%).`);
-  });
-
-  /* -----------------------------
-     C) BORDERLINE STRETCH (0–1%)
-     ----------------------------- */
+  /* ---------- Stretch advisories ---------- */
   if (out.stretchPct >= 0 && out.stretchPct < 1)
-    amber.push(`Stretch is very low (≈${out.stretchPct.toFixed(2)}%). Verify dimensions.`);
+    amber.push({ id:"A_STRETCH_LOW", text:"Very low positive stretch." });
 
-  /* -----------------------------
-     D) TEMP-SPECIFIC BORDERLINE BEHAVIOR
-        - Nominal safe, extreme temps borderline
-     ----------------------------- */
-  if (meta.nominal) {
-    const cNom = meta.nominal.compressionPct;
+  if (out.stretchPct > 3 && out.stretchPct <= 5)
+    amber.push({ id:"A_STRETCH_HIGH", text:"Stretch above recommended 1-3% range." });
 
-    out.temperatureResults.forEach(item => {
-      if (item.tempC !== AMBIENT) {
-        const cOther = item.compressionPct;
+  /* ---------- Gland fill advisories ---------- */
+  out.temperatureResults.forEach(t => {
+    if (t.glandFillPct > 85 && t.glandFillPct <= 90)
+      amber.push({ id:"A_GF_EDGE", temps:[t.tempC], text:"Gland fill near upper recommended limit." });
+  });
 
-        // borderline at hot/cold but nominal OK
-        if (
-          (cNom >= 15 && cNom <= 25) &&
-          ((cOther >= 15 && cOther < 17) || (cOther > 23 && cOther <= 25))
-        ) {
-          amber.push(
-            `Compression at ${item.tempC}°C is borderline while nominal remains acceptable.`
-          );
-        }
-      }
-    });
+  if (meta.nominal && meta.nominal.glandFillPct < 70)
+    amber.push({ id:"A_GF_LOW", text:"Low nominal gland fill reduces sealing robustness." });
+
+  /* ---------- Geometry ---------- */
+  if (p.rTop > p.gw*0.4 || p.rBottom > p.gw*0.4)
+    amber.push({ id:"A_RADII_LARGE", text:"Corner radii large relative to gland width." });
+
+  if (p.gap < p.cs*0.02)
+    amber.push({ id:"A_GAP_SMALL", text:"Gap very small relative to O-ring cross-section." });
+
+  if (Math.abs(p.angle) < 1)
+    amber.push({ id:"A_ANGLE_NEAR_ZERO", text:"Near-zero gland angle; machining tolerance dominates." });
+
+  /* ---------- DOVETAIL ANGLE RULES ---------- */
+
+  if (meta.max) {
+    if (meta.max.tempC <= 140 && p.angle !== 66)
+      amber.push({ id:"A_ANGLE_TEMP_LOW", text:"66° dovetail angle recommended up to ~140°C." });
+
+    if (meta.max.tempC > 140 && p.angle !== 55)
+      amber.push({ id:"A_ANGLE_TEMP_HIGH", text:"55° dovetail angle recommended above ~140°C." });
   }
 
-  /* -----------------------------
-     E) GEOMETRIC INCONSISTENCIES
-     ----------------------------- */
+  /* ---------- Rectangular gland & sizing ---------- */
+  if (p.gw <= p.cs)
+    amber.push({ id:"A_WIDTH_CS", text:"Gland width should exceed O-ring cross-section." });
 
-  // Very large radii compared to gland width/depth (not failure, just advisory)
-  if (params.rTop > params.gw * 0.40)
-    amber.push(`Top radius appears large compared to gland width (r₁ = ${params.rTop}).`);
+  amber.push({ id:"A_DIM_STRATEGY", text:"Design practice: dimension ID/OD separately from gland width." });
+  amber.push({ id:"A_CUSTOM_SIZE", text:"Custom O-ring sizes may have higher manufacturing tolerances." });
 
-  if (params.rBottom > params.gw * 0.40)
-    amber.push(`Bottom radius appears large compared to gland width (r₂ = ${params.rBottom}).`);
+  /* ---------- Cross-section vs temperature ---------- */
+  if (csIn <= 0.103 && meta.max && meta.max.tempC > 150)
+    amber.push({ id:"A_CS_SMALL_HOT", text:"Small cross-section not recommended at high temperature." });
 
-  // Gap too small relative to CS can cause installation difficulty
-  if (params.gap < params.cs * 0.02)
-    amber.push(`Gap (e) is very small relative to O‑ring cross‑section.`);
+  if (csIn > 0.130 && csIn < 0.150 && meta.max && meta.max.tempC > 200)
+    amber.push({ id:"A_CS_MED_HOT", text:"This cross-section has limitations above 200°C." });
 
-  // Gland angle almost zero → warn about machining tolerance issues
-  if (Math.abs(params.angle) < 1)
-    amber.push(`Gland angle is extremely small; verify machining tolerances.`);
+  if (csIn >= 0.210 && meta.max && meta.max.tempC >= 200)
+    amber.push({ id:"A_CS_LARGE_HOT", text:"Larger cross-sections preferred for high-temperature durability." });
 
   return amber;
 }
@@ -754,7 +791,6 @@ function readTempC(id){
   const c = convert(val, u, "C");
   return Number.isFinite(c) ? c : NaN;
 }
-
 
 /* =====================================================================================
    WARNINGS (RED) & ALERTS (AMBER) BANNERS — renderers
@@ -991,10 +1027,11 @@ function renderResultsGrid(out, meta, stretchPct){
     card.innerHTML = `
       <div class="results-header">Ambient Temperature (23 °C)</div>
       <!--<div class="results-subheader">Nominal</div>-->
-      <div class="results-row"><span>Stretch</span><span class="${sCls}">${Math.max(0, stretchPct).toFixed(2)}%</span></div>
+      <div class="results-row"><span>Stretch</span><span class="${sCls}">${stretchPct.toFixed(2)}%</span></div>
       <div class="results-row"><span>Compression</span><span class="${cCls}">${cDisplay.toFixed(2)}%</span></div>
       <div class="results-row"><span>Gland Fill</span><span class="${fCls}">${fDisplay.toFixed(2)}%</span></div>
     `;
+    // Changed sCls ${Math.max(0, stretchPct).toFixed(2)}% to cleanly output ${stretchPct.toFixed(2)}%
     grid.appendChild(card);
   }
 
@@ -1092,15 +1129,20 @@ function runCalculation(){
   if (Number.isFinite(tMaxC)) meta.max     = out.temperatureResults.find(e=>e.tempC===tMaxC);
 
   // 6) RED/AMBER banners before results
-  const redWarnings = [
+  const rawRed = [
     ...evaluateWarnings(out),
     ...collectNominalCompressionWarning(meta.nominal)
   ];
-  renderWarningsBanner(redWarnings);
-
-  // For now, no amber alerts; framework ready if you want advisory items
-  const amberAlerts = evaluateAmbers(out, meta, params);
-  renderAlertsBanner(amberAlerts);
+  const rawAmber = evaluateAmbers(out, meta, params);
+  
+  const red = normalizeMessages(rawRed);
+  const amber = normalizeMessages(rawAmber);
+  
+  if (red)
+    renderWarningsBanner(red.map(m => `${m.text}${formatTemps(m.temps)}`));
+  
+  if (amber)
+    renderAlertsBanner(amber.map(m => `${m.text}${formatTemps(m.temps)}`));
 
   // 7) Render results
   renderResultsGrid(out, meta, out.stretchPct);
