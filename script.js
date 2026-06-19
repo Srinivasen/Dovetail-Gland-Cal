@@ -46,6 +46,74 @@ const mandatoryFields = [
   "alpha","oringMaterialGroup"
 ];
 
+
+/* =====================================================================================
+   MESSAGE NORMALIZATION & SUPPRESSION (ADDITIVE)
+   -------------------------------------------------------------------------------------
+   Purpose:
+   - Group per-temperature messages into one line
+   - Collapse nominal + per-temp messages
+   - Prevent banner spam unless inputs materially change
+   - Does NOT change engineering logic
+   ===================================================================================== */
+
+let _lastMessageSignature = "";
+
+/** Stable stringify for change detection */
+function stableStringify(obj) {
+  return JSON.stringify(obj, Object.keys(obj).sort());
+}
+
+/** Normalize, group, dedupe, and suppress alerts by rule ID */
+function normalizeMessages(messages) {
+  const map = new Map();
+
+  messages.forEach(m => {
+    if (typeof m === "string") {
+      m = { id: m, text: m, temps: [] };
+    }
+
+    if (!m || typeof m !== "object") {
+      m = { id: "UNKNOWN", text: "Unknown warning", temps: [] };
+    }
+
+    if (!m.text) {
+      m.text = "Unknown warning";
+    }
+
+    if (!m.id) {
+      m.id = m.text;
+    }
+
+    if (!map.has(m.id)) {
+      map.set(m.id, { ...m, temps: m.temps ? [...m.temps] : [] });
+    } else if (m.temps) {
+      map.get(m.id).temps.push(...m.temps);
+    }
+  });
+
+  const normalized = [...map.values()].map(m => {
+    if (m.temps && m.temps.length) {
+      m.temps = [...new Set(m.temps)].sort((a,b)=>a-b);
+    }
+    return m;
+  });
+
+  const signature = stableStringify(normalized);
+  if (signature === _lastMessageSignature) return null;
+
+  _lastMessageSignature = signature;
+  return normalized;
+}
+
+/** Format temperatures for display */
+function formatTemps(temps) {
+  if (!temps || !temps.length) return "";
+  return temps.length === 1
+    ? ` at ${temps[0]}°C`
+    : ` at ${temps.join(", ")}°C`;
+}
+
 /** Material → CTE mapping */
 const MATERIAL_TO_CTE = {
   "FFKM": { alpha: 0.00035 },
@@ -598,14 +666,45 @@ function circularSegmentArea(r, angle){
   return r*r*Math.acos((r-h)/r) - (r-h)*Math.sqrt(2*r*h - h*h);
 }
 
-/** Dovetail cross-section area (simplified model) */
+/** Tangential radius area correction for a corner blend */
+function cornerRadiusDelta(r, angleDeg) {
+  if (r <= 0) return 0;
+  
+  // Half-angle of the corner profile intersection
+  const halfAngRad = (angleDeg / 2) * PI / 180;
+  
+  // Area between sharp intersection point and the tangential arc blend
+  // Area of the sharp triangular corner tip
+  const tri = 0.5 * (r / Math.tan(halfAngRad)) * r;
+
+  // Area of the smooth circular sector blending into that corner
+  const sector = ((180 - angleDeg) / 360) * Math.PI * r * r;
+  
+  // The delta area difference
+  return 4 * (tri - sector);
+}
+
+/** Dovetail cross-section area (simplified model) 
+ * @param {number} gw - Narrow top opening width
+ * @param {number} gd - Gland depth
+ * @param {number} ang - Angle from the horizontal plane (degrees)
+ * @param {number} rTop - Top entry radius
+ * @param {number} rBottom - Bottom floor corner radius
+ * @param {number} gap - Extrusion clearance gap
+*/
+
 function dovetailCrossSection(gw, gd, ang, rTop, rBottom, gap){
   const angRad = ang * PI/180;
+
   const topWidth = gw + 2 * (gd / Math.tan(angRad));
   const A_trap   = 0.5 * (gw + topWidth) * gd;
-  const A_top    = 2 * circularSegmentArea(rTop, ang);
-  const A_bottom = 2 * circularSegmentArea(rBottom, ang);
-  const A_gap    = (gw + 2*rTop) * gap;
+
+  const A_top = cornerRadiusDelta(rTop, ang);
+  const A_bottom = cornerRadiusDelta(rBottom, ang);
+
+  const gapWidth = gw + 2*(rTop / Math.tan((ang/2)*PI/180));
+  const A_gap = gapWidth * gap;
+
   return A_trap + A_top - A_bottom + A_gap;
 }
 
@@ -624,6 +723,7 @@ function calculateDovetail(p, tempsList){
 
   // Gland volume (2D area × circumferential length)
   const crossArea = dovetailCrossSection(p.gw, p.gd, p.angle, p.rTop, p.rBottom, p.gap);
+
   const glandVolume = crossArea * PI * p.centerline;
 
   const results = temps.map(tempC => {
@@ -641,16 +741,45 @@ function calculateDovetail(p, tempsList){
 }
 
 /** Warning rules (engineering) */
-function evaluateWarnings(out){
+function evaluateWarnings(out, p){
   const warn = [];
 
-  if (out.stretchPct < 0) warn.push("O-ring is loose (negative stretch).");
-  else if (out.stretchPct > 5) warn.push("Stretch exceeds recommended 5%.");
+  // Stretch violations
+  if (out.stretchPct < 0) {
+    warn.push({ id:"R_STRETCH_NEG", text:"Negative stretch (loose O-ring)." });
+  } else if (out.stretchPct > 5) {
+    warn.push({ id:"R_STRETCH_HIGH", text:"Stretch exceeds recommended 5%." });
+  }
 
+  // Gland Angle Severity
+  const angle = Number(p.angle)
+  if (Number.isFinite(angle) && (angle < 45 || angle > 75)) {
+    warn.push({ id:"R_ANGLE_RANGE", text:"Dovetail angle outside acceptable range, suggested range is 45-75°" });
+  }
+
+  // Compression & gland fill violations (any temperature)
   out.temperatureResults.forEach(t => {
-    if (t.compressionPct < 15) warn.push(`Compression ${t.tempC}°C < 15%`);
-    if (t.compressionPct > 25) warn.push(`Compression ${t.tempC}°C > 25%`);
-    if (t.glandFillPct > 90)   warn.push(`Gland fill ${t.tempC}°C > 90%`);
+    if (t.compressionPct < 15) {
+      warn.push({
+        id: "R_COMP_LOW",
+        temps: [t.tempC],
+        text: "Compression below 15%."
+      });
+    }
+    if (t.compressionPct > 25) {
+      warn.push({
+        id: "R_COMP_HIGH",
+        temps: [t.tempC],
+        text: "Compression above 25%."
+      });
+    }
+    if (t.glandFillPct > 90) {
+      warn.push({
+        id: "R_GF_HIGH",
+        temps: [t.tempC],
+        text: "Gland fill exceeds 90%."
+      });
+    }
   });
 
   return warn;
@@ -666,81 +795,71 @@ function evaluateWarnings(out){
    E) Geometry inconsistencies (radii vs gland width/depth)
    ===================================================================================== */
 
-function evaluateAmbers(out, meta, params) {
+function evaluateAmbers(out, meta, p) {
   const amber = [];
+  const csIn = unit === "in" ? p.cs : p.cs / IN_TO_MM;
 
-  /* -----------------------------
-     A) BORDERLINE COMPRESSION
-     ----------------------------- */
-  out.temperatureResults.forEach(item => {
-    const c = item.compressionPct;
+  /* ---------- Borderline compression ---------- */
+  out.temperatureResults.forEach(t => {
+    if (t.compressionPct >= 15 && t.compressionPct < 17)
+      amber.push({ id:"A_COMP_LOW_EDGE", temps:[t.tempC], text:"Compression near lower acceptable limit." });
 
-    // near lower band: 15%–17%
-    if (c >= 15 && c < 17)
-      amber.push(`Compression at ${item.tempC}°C is near the lower limit (≈${c.toFixed(2)}%).`);
-
-    // near upper band: 23%–25%
-    if (c > 23 && c <= 25)
-      amber.push(`Compression at ${item.tempC}°C is approaching the upper limit (≈${c.toFixed(2)}%).`);
+    if (t.compressionPct > 23 && t.compressionPct <= 25)
+      amber.push({ id:"A_COMP_HIGH_EDGE", temps:[t.tempC], text:"Compression approaching upper limit." });
   });
 
-  /* -----------------------------
-     B) BORDERLINE GLAND FILL (85–90%)
-     ----------------------------- */
-  out.temperatureResults.forEach(item => {
-    const gf = item.glandFillPct;
-    if (gf > 85 && gf <= 90)
-      amber.push(`Gland Fill at ${item.tempC}°C is approaching maximum capacity (≈${gf.toFixed(2)}%).`);
-  });
-
-  /* -----------------------------
-     C) BORDERLINE STRETCH (0–1%)
-     ----------------------------- */
+  /* ---------- Stretch advisories ---------- */
   if (out.stretchPct >= 0 && out.stretchPct < 1)
-    amber.push(`Stretch is very low (≈${out.stretchPct.toFixed(2)}%). Verify dimensions.`);
+    amber.push({ id:"A_STRETCH_LOW", text:"Very low positive stretch." });
 
-  /* -----------------------------
-     D) TEMP-SPECIFIC BORDERLINE BEHAVIOR
-        - Nominal safe, extreme temps borderline
-     ----------------------------- */
-  if (meta.nominal) {
-    const cNom = meta.nominal.compressionPct;
+  if (out.stretchPct > 3 && out.stretchPct <= 5)
+    amber.push({ id:"A_STRETCH_HIGH", text:"Stretch above recommended 1-3% range." });
 
-    out.temperatureResults.forEach(item => {
-      if (item.tempC !== AMBIENT) {
-        const cOther = item.compressionPct;
+  /* ---------- Gland fill advisories ---------- */
+  out.temperatureResults.forEach(t => {
+    if (t.glandFillPct > 85 && t.glandFillPct <= 90)
+      amber.push({ id:"A_GF_EDGE", temps:[t.tempC], text:"Gland fill near upper recommended limit." });
+  });
 
-        // borderline at hot/cold but nominal OK
-        if (
-          (cNom >= 15 && cNom <= 25) &&
-          ((cOther >= 15 && cOther < 17) || (cOther > 23 && cOther <= 25))
-        ) {
-          amber.push(
-            `Compression at ${item.tempC}°C is borderline while nominal remains acceptable.`
-          );
-        }
-      }
-    });
+  if (meta.nominal && meta.nominal.glandFillPct < 70)
+    amber.push({ id:"A_GF_LOW", text:"Low nominal gland fill reduces sealing robustness." });
+
+  /* ---------- Geometry ---------- */
+  if (p.rTop > p.gw*0.4 || p.rBottom > p.gw*0.4)
+    amber.push({ id:"A_RADII_LARGE", text:"Corner radii large relative to gland width." });
+
+  if (p.gap < p.cs*0.02)
+    amber.push({ id:"A_GAP_SMALL", text:"Gap very small relative to O-ring cross-section." });
+
+  if (Math.abs(p.angle) < 1)
+    amber.push({ id:"A_ANGLE_NEAR_ZERO", text:"Near-zero gland angle; machining tolerance dominates." });
+
+  /* ---------- DOVETAIL ANGLE RULES ---------- */
+
+  if (meta.max) {
+    if (meta.max.tempC <= 140 && p.angle !== 66)
+      amber.push({ id:"A_ANGLE_TEMP_LOW", text:"66° dovetail angle recommended up to ~140°C." });
+
+    if (meta.max.tempC > 140 && p.angle !== 55)
+      amber.push({ id:"A_ANGLE_TEMP_HIGH", text:"55° dovetail angle recommended above ~140°C." });
   }
 
-  /* -----------------------------
-     E) GEOMETRIC INCONSISTENCIES
-     ----------------------------- */
+  /* ---------- Rectangular gland & sizing ---------- */
+  if (p.gw <= p.cs)
+    amber.push({ id:"A_WIDTH_CS", text:"Gland width should exceed O-ring cross-section." });
 
-  // Very large radii compared to gland width/depth (not failure, just advisory)
-  if (params.rTop > params.gw * 0.40)
-    amber.push(`Top radius appears large compared to gland width (r₁ = ${params.rTop}).`);
+  amber.push({ id:"A_DIM_STRATEGY", text:"Design practice: dimension ID/OD separately from gland width." });
+  amber.push({ id:"A_CUSTOM_SIZE", text:"Custom O-ring sizes may have higher manufacturing tolerances." });
 
-  if (params.rBottom > params.gw * 0.40)
-    amber.push(`Bottom radius appears large compared to gland width (r₂ = ${params.rBottom}).`);
+  /* ---------- Cross-section vs temperature ---------- */
+  if (csIn <= 0.103 && meta.max && meta.max.tempC > 150)
+    amber.push({ id:"A_CS_SMALL_HOT", text:"Small cross-section not recommended at high temperature." });
 
-  // Gap too small relative to CS can cause installation difficulty
-  if (params.gap < params.cs * 0.02)
-    amber.push(`Gap (e) is very small relative to O‑ring cross‑section.`);
+  if (csIn > 0.130 && csIn < 0.150 && meta.max && meta.max.tempC > 200)
+    amber.push({ id:"A_CS_MED_HOT", text:"This cross-section has limitations above 200°C." });
 
-  // Gland angle almost zero → warn about machining tolerance issues
-  if (Math.abs(params.angle) < 1)
-    amber.push(`Gland angle is extremely small; verify machining tolerances.`);
+  if (csIn >= 0.210 && meta.max && meta.max.tempC >= 200)
+    amber.push({ id:"A_CS_LARGE_HOT", text:"Larger cross-sections preferred for high-temperature durability." });
 
   return amber;
 }
@@ -754,7 +873,6 @@ function readTempC(id){
   const c = convert(val, u, "C");
   return Number.isFinite(c) ? c : NaN;
 }
-
 
 /* =====================================================================================
    WARNINGS (RED) & ALERTS (AMBER) BANNERS — renderers
@@ -814,7 +932,7 @@ function collectPrecalcWarnings() {
 function collectNominalCompressionWarning(nominalEntry) {
   if (!nominalEntry) return [];
   const c = nominalEntry.compressionPct;
-  return (c >= 15 && c <= 25) ? [] : [`Nominal compression ${c.toFixed(2)}% is outside the 15-25% band.`];
+  return (c >= 15 && c <= 25) ? [] : [{ id:"R_COMP_NOM", text:`Nominal compression ${c.toFixed(2)}% is outside the 15–25% band.` }];
 }
 
 
@@ -991,7 +1109,7 @@ function renderResultsGrid(out, meta, stretchPct){
     card.innerHTML = `
       <div class="results-header">Ambient Temperature (23 °C)</div>
       <!--<div class="results-subheader">Nominal</div>-->
-      <div class="results-row"><span>Stretch</span><span class="${sCls}">${Math.max(0, stretchPct).toFixed(2)}%</span></div>
+      <div class="results-row"><span>Stretch</span><span class="${sCls}">${stretchPct.toFixed(2)}%</span></div>
       <div class="results-row"><span>Compression</span><span class="${cCls}">${cDisplay.toFixed(2)}%</span></div>
       <div class="results-row"><span>Gland Fill</span><span class="${fCls}">${fDisplay.toFixed(2)}%</span></div>
     `;
@@ -1027,6 +1145,12 @@ function renderResultsGrid(out, meta, stretchPct){
   addOpCard("Max", meta.max);
 }
 
+function toCanonicalInches(value, unit){
+  if (!Number.isFinite(value)) return NaN;
+  return (unit === "mm") ? value / 25.4 : value;
+}
+
+let _lastParams = null;
 
 /* =====================================================================================
    CALCULATION ENTRY POINT (banners, no popups)
@@ -1050,8 +1174,15 @@ function runCalculation(){
 
   // 2) Gather inputs from originals
   const readOrig = id => {
-    const el=document.getElementById(id);
-    return Number(el?.dataset.originalValue);
+    const el = document.getElementById(id);
+    if (!el) return NaN;
+
+    const val = Number(el.dataset.originalValue);
+    const unit = el.dataset.originalUnit || "in";
+
+    const converted = toCanonicalInches(val, unit);
+
+    return converted;
   };
 
   const params = {
@@ -1067,6 +1198,9 @@ function runCalculation(){
     alpha: Number(document.getElementById("alpha").value) || ALPHA_DEFAULT
   };
 
+  _lastParams = params;
+  //console.log("Normalized params (inches):", params);
+  
   // 3) Build temperature list (canonical °C)
   const tAmbientC = AMBIENT;
   const tMinC = readTempC("tempMin");
@@ -1092,15 +1226,43 @@ function runCalculation(){
   if (Number.isFinite(tMaxC)) meta.max     = out.temperatureResults.find(e=>e.tempC===tMaxC);
 
   // 6) RED/AMBER banners before results
-  const redWarnings = [
-    ...evaluateWarnings(out),
+  const rawRed = [
+    ...evaluateWarnings(out, _lastParams),
     ...collectNominalCompressionWarning(meta.nominal)
   ];
-  renderWarningsBanner(redWarnings);
+  const rawAmber = evaluateAmbers(out, meta, params);
+  //console.log("RAW RED INPUT →", rawRed);
+  const red = normalizeMessages(rawRed);
+  //console.log("NORMALIZED RED →", red);
 
-  // For now, no amber alerts; framework ready if you want advisory items
-  const amberAlerts = evaluateAmbers(out, meta, params);
-  renderAlertsBanner(amberAlerts);
+  const amber = normalizeMessages(rawAmber);
+  
+
+  if (red && red.length) {
+    //console.log("RENDER INPUT →", red);
+
+    renderWarningsBanner(
+      red.map(m => {
+        const text = (m && m.text) ? m.text : "Unknown warning";
+        const temps = (m && m.temps) ? formatTemps(m.temps) : "";
+        return text + temps;
+      })
+    );
+  } else {
+    renderWarningsBanner([]); // ✅ ensures banner hides
+  }
+
+  if (amber && amber.length) {
+    renderAlertsBanner(
+      amber.map(m => {
+        const text = (m && m.text) ? m.text : "Unknown alert";
+        const temps = (m && m.temps) ? formatTemps(m.temps) : "";
+        return text + temps;
+      })
+    );
+  } else {
+    renderAlertsBanner([]);
+  }
 
   // 7) Render results
   renderResultsGrid(out, meta, out.stretchPct);
@@ -1122,7 +1284,7 @@ function renderLastResults(){
   const { out, meta } = _lastRender;
 
   const redWarnings = [
-    ...evaluateWarnings(out),
+    ...evaluateWarnings(out, _lastParams),
     ...collectNominalCompressionWarning(meta.nominal)
   ];
   renderWarningsBanner(redWarnings);
